@@ -1,11 +1,16 @@
-use rocket::*;
+use rocket::{
+    serde::json::{serde_json::json, Value},
+    *,
+};
 
 #[get("/")]
-fn index() -> String {
-    "Hello Rocket".to_owned()
+fn index() -> Value {
+    json!({
+        "hello": "world",
+    })
 }
 
 #[launch]
 fn rocket() -> Rocket<Build> {
-    rocket::build().mount("/", routes![index])
+    rocket::build().mount("/api/", routes![index])
 }

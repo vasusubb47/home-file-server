@@ -1,0 +1,19 @@
+version: "2.18"
+services:
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=testDb
+    volumes:
+      - D:/data/pgdata:/var/lib/pgostgresql/data
+    ports:
+      - "5432:5432"
+
+  rust_rocket:
+    build: .
+    volumes:
+      - D:/data/home-file-server:/data
+    ports:
+      - 8000:8000
