@@ -3,15 +3,16 @@ services:
   db:
     image: postgres:15
     environment:
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=testDb
+      - POSTGRES_PASSWORD=Home_File_Server
+      - POSTGRES_DB=HFS_Db
     volumes:
-      - D:/data/pgdata:/var/lib/pgostgresql/data
+      - D:/data/pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5342:5432"
 
   rust_rocket:
+    depends_on:
+      - db
     build: .
     volumes:
       - D:/data/home-file-server:/data

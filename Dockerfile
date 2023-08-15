@@ -1,4 +1,4 @@
-FROM rust:latest as build
+FROM rust:slim as build
 
 WORKDIR /myProjects/home-file-server
 COPY . .
