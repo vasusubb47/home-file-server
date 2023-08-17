@@ -1,10 +1,10 @@
 FROM rust:slim as build
 
-WORKDIR /myProjects/home-file-server
+WORKDIR /
 COPY . .
 
-RUN cargo build
+RUN cargo build --release
 
 EXPOSE 8000
 
-CMD ["cargo", "r"]
+CMD ["cargo", "run", "--release"]

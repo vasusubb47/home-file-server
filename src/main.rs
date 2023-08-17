@@ -6,6 +6,8 @@ use sqlx::{self, postgres::PgPool};
 
 use crate::models::file::*;
 use crate::models::user_info::*;
+use dotenv::dotenv;
+use std::env::var;
 
 mod models;
 
@@ -18,9 +20,11 @@ async fn index() -> Value {
 
 #[launch]
 async fn rocket() -> Rocket<Build> {
-    let url = "postgres://postgres:Home_File_Server@db:5432/HFS_Db";
+    dotenv().ok();
+    // let url = "postgres://postgres:Home_File_Server@db:5432/HFS_Db";
+    let url = var("DATABASE_URL").expect("Couldn't find database url from environment variable.");
 
-    let pool = sqlx::postgres::PgPool::connect(url)
+    let pool = sqlx::postgres::PgPool::connect(&url)
         .await
         .expect("Failed to connect to database");
 
