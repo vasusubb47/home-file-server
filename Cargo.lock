@@ -876,8 +876,10 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dotenv",
+ "rand",
  "rocket",
  "serde",
+ "sha2",
  "sqlx",
  "uuid",
 ]

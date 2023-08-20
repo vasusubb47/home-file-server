@@ -1,15 +1,17 @@
+use dotenv::dotenv;
 use rocket::{
     serde::json::{serde_json::json, Value},
     *,
 };
 use sqlx::{self, postgres::PgPool};
-
-use crate::models::file::*;
-use crate::models::user_info::*;
-use dotenv::dotenv;
 use std::env::var;
 
+use crate::controlers::user_info::*;
+use crate::models::user_file::*;
+
+mod controlers;
 mod models;
+mod utility;
 
 #[get("/")]
 async fn index() -> Value {
@@ -36,6 +38,9 @@ async fn rocket() -> Rocket<Build> {
     rocket::build()
         .manage::<PgPool>(pool)
         .mount("/api/", routes![index])
-        .mount("/api/user/", routes![get_all_users])
+        .mount(
+            "/api/user/",
+            routes![get_all_users, user_login, register_user],
+        )
         .mount("/api/file/", routes![get_all_files])
 }

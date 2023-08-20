@@ -8,24 +8,26 @@ use sqlx::{self, postgres::PgPool, FromRow};
 use uuid::Uuid;
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct File {
+pub struct UserFile {
     pub file_id: Uuid,
     pub user_id: Uuid,
     pub file_name: String,
     pub created_date: NaiveDateTime,
+    pub file_size: i32,
+    pub file_hash: String,
     pub is_shared: bool,
 }
 
 #[get("/")]
 pub async fn get_all_files(pool: &rocket::State<PgPool>) -> Value {
-    let q = "SELECT * FROM file";
+    let q = "SELECT * FROM userfile";
 
-    let query = sqlx::query_as::<_, File>(q);
+    let query = sqlx::query_as::<_, UserFile>(q);
 
-    let users = query
+    let files = query
         .fetch_all(pool.inner())
         .await
-        .expect("Failed To load Users.");
+        .expect("Failed To load Files.");
 
-    json!(users)
+    json!(files)
 }
