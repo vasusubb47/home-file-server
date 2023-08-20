@@ -27,12 +27,12 @@ pub struct NewUser {
     pub passcode: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum NewUserError {
     InvalidEmail,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum UserError {
     InvalidEmail,
     WrongPasscode,
@@ -112,8 +112,6 @@ pub async fn login_user_by_email(
     let query = sqlx::query_as::<_, UserLogin>(query).bind(user_login.email.to_owned());
 
     let users = query.fetch_all(pool).await;
-
-    println!("{:?}", user_login);
 
     match users {
         Ok(users) => {
