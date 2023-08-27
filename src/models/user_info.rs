@@ -1,7 +1,10 @@
 use ::serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
+use hmac::{Hmac, Mac};
+use jwt::SignWithKey;
 use sha2::{Digest, Sha256};
 use sqlx::{self, postgres::PgPool, FromRow};
+use std::collections::BTreeMap;
 use std::env::var;
 use uuid::Uuid;
 
@@ -150,10 +153,17 @@ pub async fn login_user_by_email(
 
     match user_info {
         Ok(user_info) => {
-            let JWT_SECRET =
+            let jwt_secret =
                 var("JWT_SECRET").expect("Couldn't find JWT SECRET from environment variable.");
-            Ok("".to_owned())
+            let key: Hmac<Sha256> = Hmac::<Sha256>::new_from_slice(jwt_secret.as_bytes()).unwrap();
+
+            let mut claims = BTreeMap::new();
+            claims.insert("userId", user_info.user_id.to_string());
+            claims.insert("userName", user_info.user_name);
+
+            let token_str = claims.sign_with_key(&key).unwrap();
+            Ok(token_str)
         }
-        Err(userErr) => Err(userErr),
+        Err(user_err) => Err(user_err),
     }
 }

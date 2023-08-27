@@ -1,56 +1,67 @@
-use rocket::{
-    http::Status,
-    serde::json::{serde_json::json, Json, Value},
-    *,
-};
-use sqlx::PgPool;
+use actix_web::{get, post, web, HttpResponse, Responder};
+use serde_json::json;
 
 use crate::{
+    app_data::AppData,
     models::user_info::{
         get_all_user_info, insert_user, login_user_by_email, NewUser, NewUserError, UserError,
-        UserInfo, UserLogin,
+        UserLogin,
     },
-    utility::api::ApiResponse,
 };
 
+pub fn user_info_config(config: &mut web::ServiceConfig) {
+    let scope = web::scope("/api/user")
+        .service(get_all_users)
+        .service(register_user)
+        .service(user_login);
+
+    config.service(scope);
+}
+
 #[get("/")]
-pub async fn get_all_users(pool: &rocket::State<PgPool>) -> Result<Value, Status> {
-    let users = get_all_user_info(pool).await;
+pub async fn get_all_users(data: web::Data<AppData>) -> impl Responder {
+    let users = get_all_user_info(&data.pg_conn).await;
 
     match users {
-        Some(users) => Ok(json!(users)),
-        None => Err(Status::InternalServerError),
+        Some(users) => HttpResponse::Ok().json(json!(users)),
+        None => HttpResponse::NoContent().into(),
     }
 }
 
-#[post("/register", data = "<new_user>")]
+#[post("/register")]
 pub async fn register_user(
-    pool: &rocket::State<PgPool>,
-    new_user: Json<NewUser>,
-) -> ApiResponse<UserInfo, NewUserError> {
-    let user = insert_user(pool, &new_user).await;
+    data: web::Data<AppData>,
+    new_user: web::Json<NewUser>,
+) -> impl Responder {
+    let user = insert_user(&data.pg_conn, &new_user).await;
 
     match user {
-        Ok(user) => ApiResponse::success_data(user, Status::Ok),
-        Err(e) => {
-            println!("{:#?}", e);
-            ApiResponse::error_data(e, Status::BadRequest)
+        Ok(user) => HttpResponse::Ok().json(json!(user)),
+        Err(error) => {
+            println!("{:#?}", error);
+            match error {
+                NewUserError::InvalidEmail => HttpResponse::BadRequest().body(stringify!(error)),
+            }
         }
     }
 }
 
-#[post("/login", data = "<login_user>")]
+#[post("/login")]
 pub async fn user_login(
-    pool: &rocket::State<PgPool>,
-    login_user: Json<UserLogin>,
-) -> ApiResponse<(), UserError> {
-    let user = login_user_by_email(pool, &login_user).await;
+    data: web::Data<AppData>,
+    login_user: web::Json<UserLogin>,
+) -> impl Responder {
+    let user = login_user_by_email(&data.pg_conn, &login_user).await;
 
     match user {
-        Ok(user) => ApiResponse::success_data((), Status::Accepted),
-        Err(e) => {
-            println!("{:#?}", e);
-            ApiResponse::error_data(e, Status::Unauthorized)
+        Ok(user) => HttpResponse::Ok().json(json!(user)),
+        Err(error) => {
+            println!("{:#?}", error);
+            match error {
+                UserError::InvalidEmail | UserError::WrongPasscode => {
+                    HttpResponse::BadRequest().body(stringify!(e))
+                }
+            }
         }
     }
 }

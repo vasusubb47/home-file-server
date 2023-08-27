@@ -1,11 +1,11 @@
 use ::serde::{Deserialize, Serialize};
+use actix_web::{get, web, HttpResponse, Responder};
 use chrono::NaiveDateTime;
-use rocket::{
-    serde::json::{serde_json::json, Value},
-    *,
-};
-use sqlx::{self, postgres::PgPool, FromRow};
+use serde_json::json;
+use sqlx::{self, FromRow};
 use uuid::Uuid;
+
+use crate::app_data::AppData;
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct UserFile {
@@ -18,16 +18,22 @@ pub struct UserFile {
     pub is_shared: bool,
 }
 
+pub fn user_file_config(config: &mut web::ServiceConfig) {
+    let scope = web::scope("/api/file").service(get_all_files);
+
+    config.service(scope);
+}
+
 #[get("/")]
-pub async fn get_all_files(pool: &rocket::State<PgPool>) -> Value {
+pub async fn get_all_files(data: web::Data<AppData>) -> impl Responder {
     let q = "SELECT * FROM userfile";
 
     let query = sqlx::query_as::<_, UserFile>(q);
 
     let files = query
-        .fetch_all(pool.inner())
+        .fetch_all(&data.pg_conn)
         .await
         .expect("Failed To load Files.");
 
-    json!(files)
+    HttpResponse::Ok().json(json!(files))
 }

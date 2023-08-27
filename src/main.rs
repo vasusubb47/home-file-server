@@ -1,31 +1,24 @@
+use actix_web::middleware::Logger;
+use actix_web::{get, web, App, HttpServer};
 use dotenv::dotenv;
-use rocket::{
-    serde::json::{serde_json::json, Value},
-    *,
-};
-use sqlx::{self, postgres::PgPool};
+use sqlx::{self, Pool, Postgres};
 use std::env::var;
 
 use crate::controlers::user_info::*;
 use crate::models::user_file::*;
 
+mod app_data;
 mod controlers;
 mod models;
 mod utility;
 
 #[get("/")]
-async fn index() -> Value {
-    json!({
-        "Hello": "welcome",
-    })
+async fn index() -> web::Json<String> {
+    web::Json("hello world!".to_owned())
 }
 
-#[launch]
-async fn rocket() -> Rocket<Build> {
-    dotenv().ok();
-    // let url = "postgres://postgres:Home_File_Server@db:5432/HFS_Db";
+async fn db_connection() -> Pool<Postgres> {
     let url = var("DATABASE_URL").expect("Couldn't find database url from environment variable.");
-
     let pool = sqlx::postgres::PgPool::connect(&url)
         .await
         .expect("Failed to connect to database");
@@ -35,12 +28,31 @@ async fn rocket() -> Rocket<Build> {
         .await
         .expect("Failed to migrate");
 
-    rocket::build()
-        .manage::<PgPool>(pool)
-        .mount("/api/", routes![index])
-        .mount(
-            "/api/user/",
-            routes![get_all_users, user_login, register_user],
-        )
-        .mount("/api/file/", routes![get_all_files])
+    pool
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    dotenv().ok();
+    std::env::set_var("RUST_LOG", "debug");
+    std::env::set_var("RUST_LOG", "actix_web=info");
+    env_logger::init();
+
+    println!("Starting web server.");
+
+    let app_data_var = app_data::AppData {
+        pg_conn: db_connection().await,
+    };
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(app_data_var.clone()))
+            .service(index)
+            .configure(user_info_config)
+            .configure(user_file_config)
+            .wrap(Logger::default())
+    })
+    .bind(("127.0.0.1", 8000))?
+    .run()
+    .await
 }
