@@ -1,3 +1,11 @@
+/*
+    the following code is referenced from a post on stackoverflow
+    post link : https://stackoverflow.com/a/54867136/13026811
+    modifications were made to the original code to match requirements
+*/
+
+use rocket::http::hyper::header;
+// use hyper::items::{Authorization, Bearer, Headers};
 use rocket::http::{ContentType, Status};
 use rocket::request::Request;
 use rocket::response;
@@ -61,6 +69,9 @@ impl<'r, D: Serialize, E: Serialize> Responder<'r, 'r> for ApiResponse<D, E> {
         Response::build_from(self.json.respond_to(&req).unwrap())
             .status(self.status)
             .header(ContentType::JSON)
+            .header(header::Authorization(header::Bearer {
+                token: token.to_owned(),
+            }))
             .ok()
     }
 }

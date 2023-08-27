@@ -43,11 +43,11 @@ pub async fn register_user(
 pub async fn user_login(
     pool: &rocket::State<PgPool>,
     login_user: Json<UserLogin>,
-) -> ApiResponse<UserInfo, UserError> {
+) -> ApiResponse<(), UserError> {
     let user = login_user_by_email(pool, &login_user).await;
 
     match user {
-        Ok(user) => ApiResponse::success_data(user, Status::Accepted),
+        Ok(user) => ApiResponse::success_data((), Status::Accepted),
         Err(e) => {
             println!("{:#?}", e);
             ApiResponse::error_data(e, Status::Unauthorized)

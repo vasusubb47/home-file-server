@@ -882,6 +882,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dotenv",
+ "hmac",
+ "hyper",
  "jwt",
  "rand",
  "rocket",

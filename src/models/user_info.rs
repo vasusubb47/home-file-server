@@ -2,6 +2,7 @@ use ::serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
 use sha2::{Digest, Sha256};
 use sqlx::{self, postgres::PgPool, FromRow};
+use std::env::var;
 use uuid::Uuid;
 
 use crate::utility::{genarate_salt, u8_to_hex_str};
@@ -103,7 +104,7 @@ pub async fn get_user_by_email(pool: &PgPool, email: &str) -> Option<UserInfo> {
     }
 }
 
-pub async fn login_user_by_email(
+async fn get_user_info_by_email_passcode(
     pool: &PgPool,
     user_login: &UserLogin,
 ) -> Result<UserInfo, UserError> {
@@ -138,5 +139,21 @@ pub async fn login_user_by_email(
             println!("{}", error);
             Err(UserError::InvalidEmail)
         }
+    }
+}
+
+pub async fn login_user_by_email(
+    pool: &PgPool,
+    user_login: &UserLogin,
+) -> Result<String, UserError> {
+    let user_info = get_user_info_by_email_passcode(pool, user_login).await;
+
+    match user_info {
+        Ok(user_info) => {
+            let JWT_SECRET =
+                var("JWT_SECRET").expect("Couldn't find JWT SECRET from environment variable.");
+            Ok("".to_owned())
+        }
+        Err(userErr) => Err(userErr),
     }
 }
