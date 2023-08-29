@@ -2,6 +2,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use std::fmt::Write;
 
 pub mod api;
+pub mod jwt_token;
 
 pub fn u8_to_hex_str(bytes: &[u8]) -> String {
     let mut hex_str = String::with_capacity(bytes.len() * 2);

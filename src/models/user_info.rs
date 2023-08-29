@@ -1,14 +1,10 @@
 use ::serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
-use hmac::{Hmac, Mac};
-use jwt::SignWithKey;
 use sha2::{Digest, Sha256};
 use sqlx::{self, postgres::PgPool, FromRow};
-use std::collections::BTreeMap;
-use std::env::var;
 use uuid::Uuid;
 
-use crate::utility::{genarate_salt, u8_to_hex_str};
+use crate::utility::{genarate_salt, jwt_token::generate_token, u8_to_hex_str};
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -152,18 +148,7 @@ pub async fn login_user_by_email(
     let user_info = get_user_info_by_email_passcode(pool, user_login).await;
 
     match user_info {
-        Ok(user_info) => {
-            let jwt_secret =
-                var("JWT_SECRET").expect("Couldn't find JWT SECRET from environment variable.");
-            let key: Hmac<Sha256> = Hmac::<Sha256>::new_from_slice(jwt_secret.as_bytes()).unwrap();
-
-            let mut claims = BTreeMap::new();
-            claims.insert("userId", user_info.user_id.to_string());
-            claims.insert("userName", user_info.user_name);
-
-            let token_str = claims.sign_with_key(&key).unwrap();
-            Ok(token_str)
-        }
+        Ok(user_info) => Ok(generate_token(&user_info)),
         Err(user_err) => Err(user_err),
     }
 }
