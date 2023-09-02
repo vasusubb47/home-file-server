@@ -5,9 +5,9 @@ use dotenv::dotenv;
 use sqlx::{self, Pool, Postgres};
 use std::env::var;
 
+use crate::controlers::user_file::user_file_config;
 use crate::controlers::user_info::*;
 use crate::middlewares::auth::jwt_validator;
-use crate::models::user_file::*;
 
 mod app_data;
 mod controlers;
@@ -41,10 +41,13 @@ async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
 
+    let data_path = var("DATA_PATH").expect("Couldn't find DATA_PATH from environment variable.");
+
     println!("Starting web server.");
 
     let app_data_var = app_data::AppData {
         pg_conn: db_connection().await,
+        data_path,
     };
 
     HttpServer::new(move || {
@@ -52,11 +55,15 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .app_data(web::Data::new(app_data_var.clone()))
-            .service(web::scope("/api/auth").service(user_login))
+            // .service(web::scope("/api").service(index))
             .service(
-                web::scope("")
+                web::scope("/api/auth")
+                    .service(user_login)
+                    .service(register_user),
+            )
+            .service(
+                web::scope("/api")
                     .wrap(bearer_middleware)
-                    .service(index)
                     .configure(user_info_config)
                     .configure(user_file_config),
             )

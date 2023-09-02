@@ -15,9 +15,8 @@ use crate::{
 };
 
 pub fn user_info_config(config: &mut web::ServiceConfig) {
-    let scope = web::scope("/api/user")
+    let scope = web::scope("/user")
         .service(get_all_users)
-        .service(register_user)
         .service(get_login_user);
     // .service(user_login);
 
@@ -41,7 +40,7 @@ pub async fn get_login_user(
 ) -> impl Responder {
     let user_id = req_user.unwrap().id;
 
-    let user = get_user_info_by_user_id(&data.pg_conn, user_id).await;
+    let user = get_user_info_by_user_id(&data.pg_conn, &user_id).await;
 
     match user {
         Some(user) => HttpResponse::Ok().json(json!(user)),

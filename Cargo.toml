@@ -14,6 +14,7 @@ strip = true      # Strip symbols from binary*
 
 
 [dependencies]
+actix-multipart = "0.6.1"
 actix-web = "4.3.1"
 actix-web-httpauth = "0.8.0"
 chrono = { version = "0.4.26", features = ["serde"] }

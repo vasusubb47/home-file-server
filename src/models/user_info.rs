@@ -115,6 +115,8 @@ async fn get_user_info_by_email_passcode(
 
     match users {
         Ok(users) => {
+            // todo: add len check
+
             let passcode_parts = users[0].passcode.split(':').collect::<Vec<&str>>();
             let passcode_hash = passcode_parts[0];
             let passcode_salt = passcode_parts[1];
@@ -141,7 +143,7 @@ async fn get_user_info_by_email_passcode(
     }
 }
 
-pub async fn get_user_info_by_user_id(pool: &PgPool, user_id: Uuid) -> Option<UserInfo> {
+pub async fn get_user_info_by_user_id(pool: &PgPool, user_id: &Uuid) -> Option<UserInfo> {
     let query = "SELECT user_id, user_name, email, created_date FROM userinfo where user_id = $1";
 
     let query = sqlx::query_as::<_, UserInfo>(query).bind(user_id);
@@ -150,6 +152,7 @@ pub async fn get_user_info_by_user_id(pool: &PgPool, user_id: Uuid) -> Option<Us
 
     match users {
         Ok(mut users) => {
+            // todo: add len check
             let user = users.pop().unwrap();
             Some(user)
         }
