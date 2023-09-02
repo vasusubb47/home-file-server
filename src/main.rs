@@ -1,14 +1,17 @@
 use actix_web::middleware::Logger;
 use actix_web::{get, web, App, HttpServer};
+use actix_web_httpauth::middleware::HttpAuthentication;
 use dotenv::dotenv;
 use sqlx::{self, Pool, Postgres};
 use std::env::var;
 
 use crate::controlers::user_info::*;
+use crate::middlewares::auth::jwt_validator;
 use crate::models::user_file::*;
 
 mod app_data;
 mod controlers;
+mod middlewares;
 mod models;
 mod utility;
 
@@ -45,11 +48,18 @@ async fn main() -> std::io::Result<()> {
     };
 
     HttpServer::new(move || {
+        let bearer_middleware = HttpAuthentication::bearer(jwt_validator);
+
         App::new()
             .app_data(web::Data::new(app_data_var.clone()))
-            .service(index)
-            .configure(user_info_config)
-            .configure(user_file_config)
+            .service(web::scope("/api/auth").service(user_login))
+            .service(
+                web::scope("")
+                    .wrap(bearer_middleware)
+                    .service(index)
+                    .configure(user_info_config)
+                    .configure(user_file_config),
+            )
             .wrap(Logger::default())
     })
     .bind(("127.0.0.1", 8000))?

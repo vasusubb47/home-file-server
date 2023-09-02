@@ -141,6 +141,25 @@ async fn get_user_info_by_email_passcode(
     }
 }
 
+pub async fn get_user_info_by_user_id(pool: &PgPool, user_id: Uuid) -> Option<UserInfo> {
+    let query = "SELECT user_id, user_name, email, created_date FROM userinfo where user_id = $1";
+
+    let query = sqlx::query_as::<_, UserInfo>(query).bind(user_id);
+
+    let users = query.fetch_all(pool).await;
+
+    match users {
+        Ok(mut users) => {
+            let user = users.pop().unwrap();
+            Some(user)
+        }
+        Err(error) => {
+            println!("{}", error);
+            None
+        }
+    }
+}
+
 pub async fn login_user_by_email(
     pool: &PgPool,
     user_login: &UserLogin,

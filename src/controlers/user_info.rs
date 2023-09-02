@@ -1,19 +1,25 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{
+    get, post,
+    web::{self, ReqData},
+    HttpResponse, Responder,
+};
 use serde_json::json;
 
 use crate::{
     app_data::AppData,
     models::user_info::{
-        get_all_user_info, insert_user, login_user_by_email, NewUser, NewUserError, UserError,
-        UserLogin,
+        get_all_user_info, get_user_info_by_user_id, insert_user, login_user_by_email, NewUser,
+        NewUserError, UserError, UserLogin,
     },
+    utility::jwt_token::Claims,
 };
 
 pub fn user_info_config(config: &mut web::ServiceConfig) {
     let scope = web::scope("/api/user")
         .service(get_all_users)
         .service(register_user)
-        .service(user_login);
+        .service(get_login_user);
+    // .service(user_login);
 
     config.service(scope);
 }
@@ -24,6 +30,21 @@ pub async fn get_all_users(data: web::Data<AppData>) -> impl Responder {
 
     match users {
         Some(users) => HttpResponse::Ok().json(json!(users)),
+        None => HttpResponse::NoContent().into(),
+    }
+}
+
+#[get("/hello")]
+pub async fn get_login_user(
+    data: web::Data<AppData>,
+    req_user: Option<ReqData<Claims>>,
+) -> impl Responder {
+    let user_id = req_user.unwrap().id;
+
+    let user = get_user_info_by_user_id(&data.pg_conn, user_id).await;
+
+    match user {
+        Some(user) => HttpResponse::Ok().json(json!(user)),
         None => HttpResponse::NoContent().into(),
     }
 }
@@ -51,10 +72,12 @@ pub async fn user_login(
     data: web::Data<AppData>,
     login_user: web::Json<UserLogin>,
 ) -> impl Responder {
-    let user = login_user_by_email(&data.pg_conn, &login_user).await;
+    let token = login_user_by_email(&data.pg_conn, &login_user).await;
 
-    match user {
-        Ok(user) => HttpResponse::Ok().json(json!(user)),
+    match token {
+        Ok(token) => HttpResponse::Ok()
+            .append_header(("Authorization", "Bearer ".to_owned() + &token))
+            .json(json!(token)),
         Err(error) => {
             println!("{:#?}", error);
             match error {
