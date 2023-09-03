@@ -1,16 +1,19 @@
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
 use actix_web::{
-    get, post,
+    delete, get, post,
     web::{self, ReqData},
-    HttpResponse, Responder, Result,
+    HttpRequest, HttpResponse, Responder,
 };
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     app_data::AppData,
-    models::user_file::{get_all_user_files, get_user_file_by_file_id, save_user_file, UploadFile},
+    models::user_file::{
+        delete_user_file_by_file_id, get_all_user_files, get_user_file_by_file_id, save_user_file,
+        UploadFile, UserFileErrors,
+    },
     utility::jwt_token::Claims,
 };
 
@@ -18,7 +21,8 @@ pub fn user_file_config(config: &mut web::ServiceConfig) {
     let scope = web::scope("/file")
         .service(get_all_files)
         .service(save_file)
-        .service(get_file_by_id);
+        .service(get_file_by_id)
+        .service(delete_file_by_id);
 
     config.service(scope);
 }
@@ -71,22 +75,61 @@ pub async fn save_file(
     let saved_file = save_user_file(&data.pg_conn, &data.data_path, &user_id, form.0).await;
 
     match saved_file {
-        Some(saved_file) => HttpResponse::Ok().json(json!(saved_file)),
+        Some(saved_file) => HttpResponse::Created().json(json!(saved_file)),
         None => HttpResponse::InternalServerError().finish(),
     }
 }
 
 #[get("/{file_id}")]
 pub async fn get_file_by_id(
+    req: HttpRequest,
     file_id: web::Path<Uuid>,
     data: web::Data<AppData>,
     req_user: Option<ReqData<Claims>>,
-) -> Result<NamedFile> {
+) -> impl Responder {
     let user_id = req_user.unwrap().id;
 
-    let file_path = get_user_file_by_file_id(&data.pg_conn, &data.data_path, &user_id, &file_id)
-        .await
-        .unwrap();
+    let file_path =
+        get_user_file_by_file_id(&data.pg_conn, &data.data_path, &user_id, &file_id).await;
 
-    Ok(NamedFile::open(file_path)?)
+    match file_path {
+        Ok(file_path) => NamedFile::open_async(file_path)
+            .await
+            .unwrap()
+            .into_response(&req),
+        Err(error) => match error {
+            UserFileErrors::Forbidden => HttpResponse::Forbidden().finish(),
+            UserFileErrors::NotFound => HttpResponse::NotFound().finish(),
+            UserFileErrors::Deleted => HttpResponse::Gone().finish(),
+            _ => HttpResponse::InternalServerError().finish(),
+        },
+    }
+}
+
+#[delete("/{file_id}")]
+pub async fn delete_file_by_id(
+    file_id: web::Path<Uuid>,
+    data: web::Data<AppData>,
+    req_user: Option<ReqData<Claims>>,
+) -> impl Responder {
+    let user_id = req_user.unwrap().id;
+
+    let file_data =
+        delete_user_file_by_file_id(&data.pg_conn, &data.data_path, &user_id, &file_id).await;
+
+    match file_data {
+        Ok(is_deleted) => {
+            if is_deleted {
+                HttpResponse::NoContent().finish()
+            } else {
+                HttpResponse::Accepted().finish()
+            }
+        }
+        Err(error) => match error {
+            UserFileErrors::Forbidden => HttpResponse::Forbidden().finish(),
+            UserFileErrors::NotFound => HttpResponse::NotFound().finish(),
+            UserFileErrors::FailedToDelete => HttpResponse::InternalServerError().finish(),
+            _ => HttpResponse::InternalServerError().finish(),
+        },
+    }
 }
