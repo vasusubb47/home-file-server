@@ -1,21 +1,24 @@
+use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
 use actix_web::{
     get, post,
     web::{self, ReqData},
-    HttpResponse, Responder,
+    HttpResponse, Responder, Result,
 };
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::{
     app_data::AppData,
-    models::user_file::{get_all_user_files, save_user_file, UploadFile},
+    models::user_file::{get_all_user_files, get_user_file_by_file_id, save_user_file, UploadFile},
     utility::jwt_token::Claims,
 };
 
 pub fn user_file_config(config: &mut web::ServiceConfig) {
     let scope = web::scope("/file")
         .service(get_all_files)
-        .service(save_file);
+        .service(save_file)
+        .service(get_file_by_id);
 
     config.service(scope);
 }
@@ -71,4 +74,19 @@ pub async fn save_file(
         Some(saved_file) => HttpResponse::Ok().json(json!(saved_file)),
         None => HttpResponse::InternalServerError().finish(),
     }
+}
+
+#[get("/{file_id}")]
+pub async fn get_file_by_id(
+    file_id: web::Path<Uuid>,
+    data: web::Data<AppData>,
+    req_user: Option<ReqData<Claims>>,
+) -> Result<NamedFile> {
+    let user_id = req_user.unwrap().id;
+
+    let file_path = get_user_file_by_file_id(&data.pg_conn, &data.data_path, &user_id, &file_id)
+        .await
+        .unwrap();
+
+    Ok(NamedFile::open(file_path)?)
 }

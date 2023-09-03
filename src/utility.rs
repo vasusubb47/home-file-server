@@ -1,5 +1,5 @@
 use rand::{distributions::Alphanumeric, Rng};
-use std::{env, fmt::Write, path::PathBuf};
+use std::{fmt::Write, path::PathBuf};
 
 pub mod api;
 pub mod jwt_token;
@@ -26,6 +26,6 @@ pub fn get_file_type(file_path: &str) -> String {
     ext.to_str().unwrap().to_owned()
 }
 
-pub fn get_current_working_dir() -> std::io::Result<PathBuf> {
-    env::current_dir()
-}
+// pub fn get_current_working_dir() -> std::io::Result<PathBuf> {
+//     env::current_dir()
+// }

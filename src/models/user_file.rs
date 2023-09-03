@@ -1,12 +1,11 @@
-use std::fs;
-
 use ::serde::{Deserialize, Serialize};
 use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use chrono::NaiveDateTime;
 use sqlx::{self, FromRow, PgPool};
+use std::{fs, path::PathBuf};
 use uuid::Uuid;
 
-use crate::utility::{get_current_working_dir, get_file_type};
+use crate::utility::get_file_type;
 
 use super::user_info::get_user_info_by_user_id;
 
@@ -88,8 +87,7 @@ pub async fn save_user_file(
                     let user_file = get_file_info_by_id(pool, &file_uuid).await.unwrap();
 
                     let temp_file_path = file.file.path();
-                    let mut file_path = get_current_working_dir().unwrap();
-                    file_path.push(data_path);
+                    let mut file_path = PathBuf::from(data_path);
                     file_path.push(&user_file.file_name);
 
                     println!("Savinf the file at: {}", file_path.display());
@@ -112,6 +110,29 @@ pub async fn save_user_file(
                     None
                 }
             }
+        }
+        None => None,
+    }
+}
+
+pub async fn get_user_file_by_file_id(
+    pool: &PgPool,
+    data_path: &str,
+    user_id: &Uuid,
+    file_id: &Uuid,
+) -> Option<PathBuf> {
+    let file_info = get_file_info_by_id(pool, file_id).await;
+
+    match file_info {
+        Some(file_info) => {
+            if &file_info.user_id != user_id {
+                return None;
+            }
+
+            let mut file_path = PathBuf::from(data_path);
+            file_path.push(&file_info.file_name);
+
+            Some(file_path)
         }
         None => None,
     }
