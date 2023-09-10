@@ -10,7 +10,10 @@ use crate::models::user_info::UserInfo;
 pub struct Claims {
     pub iat: u64,
     pub exp: u64,
+    pub issuer: String,
+    pub issue: String,
     pub id: Uuid,
+    pub email: String,
     pub user_name: String,
 }
 
@@ -29,7 +32,10 @@ pub fn generate_token(user_info: &UserInfo) -> String {
     let claims = Claims {
         iat: current_time.timestamp() as u64,
         exp: (current_time + Duration::minutes(20)).timestamp() as u64,
+        issuer: "home_file_server".to_owned(),
+        issue: "home_file_server".to_owned(),
         id: user_info.user_id,
+        email: user_info.email.to_owned(),
         user_name: user_info.user_name.to_owned(),
     };
 

@@ -1,16 +1,8 @@
 use rand::{distributions::Alphanumeric, Rng};
-use std::{fmt::Write, path::PathBuf};
+use std::path::PathBuf;
 
 pub mod api;
 pub mod jwt_token;
-
-pub fn u8_to_hex_str(bytes: &[u8]) -> String {
-    let mut hex_str = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        write!(&mut hex_str, "{:02x}", b).unwrap();
-    }
-    hex_str
-}
 
 pub fn genarate_salt(salt_len: usize) -> String {
     rand::thread_rng()

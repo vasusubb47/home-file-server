@@ -4,7 +4,9 @@ use sha2::{Digest, Sha256};
 use sqlx::{self, postgres::PgPool, FromRow};
 use uuid::Uuid;
 
-use crate::utility::{genarate_salt, jwt_token::generate_token, u8_to_hex_str};
+use crate::utility::{genarate_salt, jwt_token::generate_token};
+
+use super::bucket::create_user_bucket;
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -61,7 +63,7 @@ pub async fn insert_user(pool: &PgPool, new_user: &NewUser) -> Result<UserInfo, 
     sha.update(new_user.passcode.to_owned() + &salt.to_owned());
     let passcode_hash = sha.finalize();
 
-    let passcode_hash = u8_to_hex_str(passcode_hash.as_slice()) + ":" + &salt;
+    let passcode_hash = format!("{:X}", passcode_hash) + ":" + &salt;
 
     let query = "INSERT INTO userinfo (user_name, email, passcode) VALUES($1, $2, $3)";
 
@@ -75,7 +77,12 @@ pub async fn insert_user(pool: &PgPool, new_user: &NewUser) -> Result<UserInfo, 
     match query {
         Ok(_) => {
             let user = get_user_by_email(pool, &new_user.email).await;
-            Ok(user.unwrap())
+
+            let user_info = user.unwrap();
+
+            let _bucket = create_user_bucket(pool, &user_info.user_id, &user_info.user_name).await;
+
+            Ok(user_info)
         }
         Err(e) => {
             println!("{:#?}", e);
@@ -127,7 +134,7 @@ async fn get_user_info_by_email_passcode(
             sha.update(user_passcode.to_owned() + passcode_salt);
             let user_passcode_hash = sha.finalize();
 
-            let user_passcode_hash = u8_to_hex_str(user_passcode_hash.as_slice());
+            let user_passcode_hash = format!("{:X}", user_passcode_hash);
 
             if passcode_hash == user_passcode_hash {
                 let user = get_user_by_email(pool, &user_login.email).await.unwrap();

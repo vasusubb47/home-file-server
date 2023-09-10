@@ -1,8 +1,13 @@
 use ::serde::{Deserialize, Serialize};
 use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use chrono::NaiveDateTime;
+use sha2::{Digest, Sha256};
 use sqlx::{self, FromRow, PgPool};
-use std::{fs, path::PathBuf};
+use std::{
+    fs::{self, File},
+    io::{self, BufReader, Read},
+    path::{Path, PathBuf},
+};
 use uuid::Uuid;
 
 use crate::utility::get_file_type;
@@ -31,6 +36,7 @@ pub enum UserFileErrors {
     NotFound,
     Deleted,
     FailedToDelete,
+    FailedToSave,
 }
 
 pub async fn get_all_user_files(pool: &PgPool, user_id: &Uuid) -> Option<Vec<UserFile>> {
@@ -74,12 +80,49 @@ pub async fn get_file_info_by_id(
     // Some(files)
 }
 
+fn save_file(file_path: &Path, temp_file_path: &Path) -> Result<String, UserFileErrors> {
+    println!("Saving the file at: {}", file_path.display());
+
+    match fs::copy(temp_file_path, file_path) {
+        Ok(_) => {
+            let _ = fs::remove_file(temp_file_path);
+            Ok(get_file_hash(file_path).unwrap())
+        }
+        Err(error) => {
+            let _ = fs::remove_file(temp_file_path);
+            println!("error while saving into the disk user file: {}", error);
+            Err(UserFileErrors::FailedToSave)
+        }
+    }
+}
+
+fn get_file_hash(path: &Path) -> io::Result<String> {
+    let input = File::open(path)?;
+    let mut reader = BufReader::new(input);
+
+    let digest = {
+        let mut hasher = Sha256::new();
+        let mut buffer = [0; 1024];
+        loop {
+            let count = reader.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            hasher.update(&buffer[..count]);
+        }
+        hasher.finalize()
+    };
+    Ok(format!("{:X}", digest))
+}
+
 pub async fn save_user_file(
     pool: &PgPool,
     data_path: &str,
     user_id: &Uuid,
     upload_file: UploadFile,
 ) -> Option<UserFile> {
+    println!("saving an file...");
+
     let user_info = get_user_info_by_user_id(pool, user_id).await;
 
     match user_info {
@@ -90,6 +133,20 @@ pub async fn save_user_file(
             let file_name =
                 file_uuid.to_string() + "." + &get_file_type(&file.file_name.unwrap().to_owned());
 
+            let mut file_path = PathBuf::from(data_path);
+            file_path.push(&file_name);
+
+            let saved_data = save_file(&file_path, file.file.path());
+            let file_hash: String;
+
+            match saved_data {
+                Ok(hash) => file_hash = hash,
+                Err(error) => {
+                    println!("Error occurred while saving file: {:?}", error);
+                    return None;
+                }
+            }
+
             let query = "INSERT INTO UserFile (file_id, user_id, file_name, file_size, file_hash) VALUES($1, $2, $3, $4, $5)";
 
             let query = sqlx::query(query)
@@ -97,7 +154,7 @@ pub async fn save_user_file(
                 .bind(&user_info.user_id)
                 .bind(&file_name)
                 .bind(file.size as i32)
-                .bind("This is file hash.")
+                .bind(file_hash)
                 .execute(pool)
                 .await;
 
@@ -105,32 +162,8 @@ pub async fn save_user_file(
                 Ok(_) => {
                     let user_file = get_file_info_by_id(pool, &file_uuid).await;
 
-                    if user_file.is_err() {}
-
                     match user_file {
-                        Ok(user_file) => {
-                            let temp_file_path = file.file.path();
-                            let mut file_path = PathBuf::from(data_path);
-                            file_path.push(&user_file.file_name);
-
-                            println!("Saving the file at: {}", file_path.display());
-
-                            match fs::copy(temp_file_path, file_path) {
-                                Ok(_) => {
-                                    let _ = fs::remove_file(temp_file_path);
-                                    Some(user_file)
-                                }
-                                Err(error) => {
-                                    let _ = fs::remove_file(temp_file_path);
-                                    println!("file info : {:#?}", user_file);
-                                    println!(
-                                        "error while saving into the disk user file: {}",
-                                        error
-                                    );
-                                    None
-                                }
-                            }
-                        }
+                        Ok(user_file) => Some(user_file),
                         Err(error) => {
                             println!("Error while saving the file info to db, error {:?}.", error);
                             return None;

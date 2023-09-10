@@ -5,6 +5,7 @@ use dotenv::dotenv;
 use sqlx::{self, Pool, Postgres};
 use std::env::var;
 
+use crate::controlers::bucket::bucket_config;
 use crate::controlers::user_file::user_file_config;
 use crate::controlers::user_info::*;
 use crate::middlewares::auth::jwt_validator;
@@ -65,7 +66,8 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api")
                     .wrap(bearer_middleware)
                     .configure(user_info_config)
-                    .configure(user_file_config),
+                    .configure(user_file_config)
+                    .configure(bucket_config),
             )
             .wrap(Logger::default())
     })
