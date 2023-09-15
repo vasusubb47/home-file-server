@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::utility::{genarate_salt, jwt_token::generate_token};
 
-use super::bucket::create_user_bucket;
+use super::bucket::{create_user_bucket, delete_user_buckets, get_all_bucket_names, BucketNames};
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -80,7 +80,20 @@ pub async fn insert_user(pool: &PgPool, new_user: &NewUser) -> Result<UserInfo, 
 
             let user_info = user.unwrap();
 
-            let _bucket = create_user_bucket(pool, &user_info.user_id, &user_info.user_name).await;
+            let bucket_names = get_all_bucket_names(pool).await.unwrap();
+
+            loop {
+                let bucket_name = BucketNames {
+                    bucket_name: genarate_salt(16),
+                };
+
+                if !bucket_names.contains(&bucket_name) {
+                    let _bucket =
+                        create_user_bucket(pool, &user_info.user_id, &bucket_name.bucket_name)
+                            .await;
+                    break;
+                }
+            }
 
             Ok(user_info)
         }
@@ -89,6 +102,12 @@ pub async fn insert_user(pool: &PgPool, new_user: &NewUser) -> Result<UserInfo, 
             Err(NewUserError::InvalidEmail)
         }
     }
+}
+
+pub async fn delete_user(pool: &PgPool, user_id: &Uuid) -> Option<()> {
+    let delete_buckets = delete_user_buckets(pool, user_id).await;
+
+    Some(())
 }
 
 pub async fn get_user_by_email(pool: &PgPool, email: &str) -> Option<UserInfo> {

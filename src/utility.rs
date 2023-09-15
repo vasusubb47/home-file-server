@@ -1,4 +1,5 @@
 use rand::{distributions::Alphanumeric, Rng};
+use std::fmt::Debug;
 use std::path::PathBuf;
 
 pub mod api;
@@ -16,6 +17,21 @@ pub fn get_file_type(file_path: &str) -> String {
     let path = PathBuf::from(file_path);
     let ext = path.extension().unwrap();
     ext.to_str().unwrap().to_owned()
+}
+
+pub fn get_vec_to_sql_str<T>(vec_data: &Vec<T>) -> String
+where
+    T: Debug,
+{
+    let mut vec_data_str = Vec::<String>::new();
+
+    for ele in vec_data {
+        vec_data_str.push(format!("'{:?}'", ele));
+    }
+
+    let sql_vec_str = vec_data_str.join(",");
+
+    format!("({})", sql_vec_str)
 }
 
 // pub fn get_current_working_dir() -> std::io::Result<PathBuf> {
