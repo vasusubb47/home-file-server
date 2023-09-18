@@ -1,3 +1,5 @@
+use std::{fs, path::PathBuf};
+
 use ::serde::{Deserialize, Serialize};
 use chrono::NaiveDateTime;
 use sqlx::{self, postgres::PgPool, FromRow};
@@ -42,7 +44,10 @@ pub async fn get_all_user_bucket_info(pool: &PgPool, user_id: &Uuid) -> Option<V
     let buckets = query.fetch_all(pool).await;
 
     match buckets {
-        Ok(buckets) => Some(buckets),
+        Ok(buckets) => {
+            println!("{:#?}", buckets);
+            Some(buckets)
+        }
         Err(error) => {
             println!(
                 "Error occurred while fetching buckets for user {:?}: {}",
@@ -72,11 +77,40 @@ pub async fn get_bucket_by_name(pool: &PgPool, bucket_name: &str) -> Option<Buck
     }
 }
 
+pub async fn _get_bucket_by_id(pool: &PgPool, bucket_id: &Uuid) -> Option<Bucket> {
+    let query = "SELECT * FROM bucket WHERE bucket_id = $1";
+
+    let query = sqlx::query_as::<_, Bucket>(query).bind(bucket_id);
+
+    let bucket = query.fetch_one(pool).await;
+
+    match bucket {
+        Ok(bucket) => Some(bucket),
+        Err(error) => {
+            println!(
+                "Error occurred while fetching buckets by bucket_id {}: {}",
+                bucket_id, error
+            );
+            None
+        }
+    }
+}
+
 pub async fn create_user_bucket(
     pool: &PgPool,
+    data_path: &str,
     user_id: &Uuid,
     bucket_name: &str,
 ) -> Option<Bucket> {
+    let mut bucket_folder_path = PathBuf::from(data_path);
+    bucket_folder_path.push(bucket_name);
+
+    if !bucket_folder_path.exists() {
+        let _ = fs::create_dir_all(bucket_folder_path);
+    } else {
+        return None;
+    }
+
     let query = "INSERT INTO bucket (user_id, bucket_name) VALUES($1, $2)";
 
     let query = sqlx::query(query)
@@ -87,10 +121,10 @@ pub async fn create_user_bucket(
 
     match query {
         Ok(_) => {
-            let buckets = get_bucket_by_name(pool, &bucket_name).await;
+            let bucket = get_bucket_by_name(pool, &bucket_name).await;
 
-            match buckets {
-                Some(buckets) => Some(buckets),
+            match bucket {
+                Some(bucket) => Some(bucket),
                 None => None,
             }
         }
@@ -107,34 +141,12 @@ pub async fn create_user_bucket(
 //     None
 // }
 //lhZzhNIOEmzMYiel
-async fn delete_buckets_with_out_check(pool: &PgPool, bucket_ids: &Vec<Uuid>) -> Option<()> {
-    println!("Vec of UUids: {}", get_vec_to_sql_str(&bucket_ids));
-
-    let query = format!(
-        "delete from bucket where bucket_id in {}",
-        get_vec_to_sql_str(&bucket_ids)
-    );
-
-    let query = sqlx::query(&query).execute(pool).await;
-
-    match query {
-        Ok(_) => Some(()),
-        Err(error) => {
-            println!("error occurred while deleting buckets : {}", error);
-            None
-        }
-    }
-}
-
-pub async fn delete_user_buckets(pool: &PgPool, user_id: &Uuid) -> Result<(), BucketDeletionError> {
-    let user_buckets = get_all_user_bucket_info(pool, user_id).await;
-
-    if user_buckets.is_none() {
-        return Err(BucketDeletionError::InvalidBucket);
-    }
-    let user_buckets = user_buckets.unwrap();
-
-    println!("deleting user_buckets \n{:#?}", user_buckets);
+async fn delete_buckets_with_out_check(
+    pool: &PgPool,
+    data_path: &str,
+    buckets: &Vec<Bucket>,
+) -> Result<(), BucketDeletionError> {
+    println!("deleting user_buckets \n{:#?}", buckets);
 
     // this line is just for error initialization
     // if after the loop error is same as below
@@ -143,7 +155,7 @@ pub async fn delete_user_buckets(pool: &PgPool, user_id: &Uuid) -> Result<(), Bu
 
     let mut bucket_ids = Vec::<Uuid>::new();
 
-    for bucket in &user_buckets {
+    for bucket in buckets {
         if bucket.is_shared {
             error = BucketDeletionError::CanNotDeleteSharedBucket;
         }
@@ -156,10 +168,50 @@ pub async fn delete_user_buckets(pool: &PgPool, user_id: &Uuid) -> Result<(), Bu
     if error != BucketDeletionError::InvalidBucket {
         return Err(error);
     }
+    // println!("Vec of UUids: {}", get_vec_to_sql_str(&bucket_ids));
 
-    match delete_buckets_with_out_check(pool, &bucket_ids).await {
-        Some(_) => Ok(()),
-        None => Err(BucketDeletionError::FailedToDeleteBucket),
+    let query = format!(
+        "delete from bucket where bucket_id in {}",
+        get_vec_to_sql_str(&bucket_ids)
+    );
+
+    let query = sqlx::query(&query).execute(pool).await;
+
+    match query {
+        Ok(_) => {
+            for bucket in buckets {
+                let mut bucket_folder_path = PathBuf::from(data_path);
+                bucket_folder_path.push(&bucket.bucket_name);
+
+                if bucket_folder_path.exists() {
+                    let _ = fs::remove_dir_all(bucket_folder_path);
+                }
+            }
+
+            Ok(())
+        }
+        Err(error) => {
+            println!("error occurred while deleting buckets : {}", error);
+            Err(BucketDeletionError::FailedToDeleteBucket)
+        }
+    }
+}
+
+pub async fn delete_user_buckets(
+    pool: &PgPool,
+    data_path: &str,
+    user_id: &Uuid,
+) -> Result<(), BucketDeletionError> {
+    let user_buckets = get_all_user_bucket_info(pool, user_id).await;
+
+    if user_buckets.is_none() {
+        return Err(BucketDeletionError::InvalidBucket);
+    }
+    let user_buckets = user_buckets.unwrap();
+
+    match delete_buckets_with_out_check(pool, data_path, &user_buckets).await {
+        Ok(_) => Ok(()),
+        Err(error) => Err(error),
     }
 }
 

@@ -43,7 +43,13 @@ pub async fn create_bucket(
 ) -> impl Responder {
     let user_id = req_user.unwrap().id;
 
-    let bucket = create_user_bucket(&data.pg_conn, &user_id, &bucket_name.bucket_name).await;
+    let bucket = create_user_bucket(
+        &data.pg_conn,
+        &data.data_path,
+        &user_id,
+        &bucket_name.bucket_name,
+    )
+    .await;
 
     match bucket {
         Some(bucket) => HttpResponse::Ok().json(json!(bucket)),
@@ -58,7 +64,7 @@ pub async fn delete_bucket(
 ) -> impl Responder {
     let user_id = req_user.unwrap().id;
 
-    let delete_user_bucket = delete_user_buckets(&data.pg_conn, &user_id).await;
+    let delete_user_bucket = delete_user_buckets(&data.pg_conn, &data.data_path, &user_id).await;
 
     match delete_user_bucket {
         Ok(_) => HttpResponse::NoContent().finish(),

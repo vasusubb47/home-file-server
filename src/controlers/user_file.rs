@@ -55,13 +55,13 @@ pub async fn save_file(
     */
 
     // 10 MB
-    const MAX_FILE_SIZE: u64 = 1024 * 1024 * 10;
+    const MAX_FILE_SIZE: usize = 1024 * 1024 * 10;
     // const MAX_FILE_COUNT: i32 = 1;
 
     // reject malformed requests
     match form.file.size {
         0 => return HttpResponse::BadRequest().finish(),
-        length if length > MAX_FILE_SIZE.try_into().unwrap() => {
+        length if length > MAX_FILE_SIZE => {
             return HttpResponse::BadRequest().body(format!(
                 "The uploaded file is too large. Maximum size is {} bytes.",
                 MAX_FILE_SIZE

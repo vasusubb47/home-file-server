@@ -56,7 +56,11 @@ pub async fn get_all_user_info(pool: &PgPool) -> Option<Vec<UserInfo>> {
     }
 }
 
-pub async fn insert_user(pool: &PgPool, new_user: &NewUser) -> Result<UserInfo, NewUserError> {
+pub async fn insert_user(
+    pool: &PgPool,
+    data_path: &str,
+    new_user: &NewUser,
+) -> Result<UserInfo, NewUserError> {
     let mut sha = Sha256::new();
     let salt = genarate_salt(64);
 
@@ -88,9 +92,13 @@ pub async fn insert_user(pool: &PgPool, new_user: &NewUser) -> Result<UserInfo, 
                 };
 
                 if !bucket_names.contains(&bucket_name) {
-                    let _bucket =
-                        create_user_bucket(pool, &user_info.user_id, &bucket_name.bucket_name)
-                            .await;
+                    let _bucket = create_user_bucket(
+                        pool,
+                        data_path,
+                        &user_info.user_id,
+                        &bucket_name.bucket_name,
+                    )
+                    .await;
                     break;
                 }
             }
@@ -104,8 +112,8 @@ pub async fn insert_user(pool: &PgPool, new_user: &NewUser) -> Result<UserInfo, 
     }
 }
 
-pub async fn delete_user(pool: &PgPool, user_id: &Uuid) -> Option<()> {
-    let delete_buckets = delete_user_buckets(pool, user_id).await;
+pub async fn delete_user(pool: &PgPool, data_path: &str, user_id: &Uuid) -> Option<()> {
+    let _delete_buckets = delete_user_buckets(pool, data_path, user_id).await;
 
     Some(())
 }
